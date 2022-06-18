@@ -3,13 +3,18 @@ const app = express()
 const cors = require('cors');
 const dotenv = require("dotenv"); // menyimpan value ke dalam env variable
 // const mysql = require('mysql')
+const bearerToken = require('express-bearer-token')
 
 dotenv.config();
 
 const PORT = process.env.PORT;
 
+// memberi ijin pada browser / fe supaya bisa langsung mengakses direktori yang ditentukan
+app.use(express.static('public'))
+
 app.use(express.json());
 app.use(cors());
+app.use(bearerToken());
 
 // DB Check Connection
 const { dbConf } = require("./config/database");
