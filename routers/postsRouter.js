@@ -1,15 +1,19 @@
 const { postsController } = require("../controllers");
+const { readToken } = require("../config/encryption");
 const route = require("express").Router();
 
-route.get("/get", postsController.getPosts);
+route.get("/get", postsController.getAllPosts);
+route.get("/get/:id", postsController.getPosts);
 route.get("/get/detail", postsController.detailPost);
 route.get("/get/userPost", postsController.getUserPosts);
 route.get("/get/likedPost", postsController.getLikedPosts);
-route.post("/add", postsController.addPost);
-route.patch("/edit", postsController.editPost);
-route.delete("/delete", postsController.deletePost);
+
+route.post("/add", readToken, postsController.addPost);
+route.patch("/edit", readToken, postsController.editPost);
+route.delete("/delete", readToken, postsController.deletePost);
 route.post("/comment", postsController.addComment);
-route.post("/like", postsController.addLike);
-route.delete("/unlike", postsController.removeLike);
+
+route.post("/like", readToken, postsController.addLike);
+route.delete("/unlike", readToken, postsController.removeLike);
 
 module.exports = route;

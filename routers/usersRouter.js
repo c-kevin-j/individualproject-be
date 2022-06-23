@@ -7,8 +7,14 @@ route.get("/get/detail", usersController.getDetailUser);
 route.post("/login", usersController.userLogin);
 route.get("/login/keep", readToken, usersController.keepLogin);
 route.post("/register", usersController.registerUser);
-route.patch("/edit", usersController.editUser);
-route.patch("/edit/profile_picture", usersController.editProfPict);
-route.patch("/edit/password", usersController.editPassword);
+route.patch("/verify", readToken, usersController.verifyUser);
+route.get("/verify/send", readToken, usersController.sendVerification);
+
+route.patch("/forgot", usersController.forgotPassword);
+route.patch("/reset/password", readToken,usersController.resetPassword);
+
+route.patch("/edit", readToken, usersController.editUser);
+route.patch("/edit/profile_picture", readToken, usersController.editProfPict);
+route.patch("/edit/password", readToken, usersController.editPassword);
 
 module.exports = route;
