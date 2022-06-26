@@ -31,33 +31,38 @@ module.exports = {
       // verified status default 1 => false, nanti setelah verifikasi dibuat 0 => true
       // profile picture diisikan dengan gambar default
       // console.log(hashPassword(req.body.password))
-      const { email, username, password } = req.body;
-      let registUser = await dbQuery(
-        `insert into users (email, username, password, profile_picture) value (${dbConf.escape(
-          email
-        )},${dbConf.escape(username)},${dbConf.escape(
-          hashPassword(password)
-        )},${dbConf.escape("/imgUsers/IMGUSERS-default.webp")})`
-      );
-      // console.log(registUser.insertId);
 
-      if (registUser.insertId) {
-        let resultLogin = await dbQuery(
-          `select id, username, first_name, last_name, email, profile_picture, bio, verified_status from users where id=${registUser.insertId};`
+      const { email, username, password } = req.body;
+
+      let currentUsers = await dbQuery(`select email,username from users`);
+      let emailCheck = currentUsers.map((val) => val.email).includes(email);
+      let usernameCheck = currentUsers
+        .map((val) => val.username)
+        .includes(username);
+
+      if (emailCheck) {
+        res
+          .status(200)
+          .send({ success: false, message: "Email is already used" });
+      } else if (usernameCheck) {
+        res
+          .status(200)
+          .send({ success: false, message: "Username is already used" });
+      } else {
+        let registUser = await dbQuery(
+          `insert into users (email, username, password, profile_picture) value (${dbConf.escape(
+            email
+          )},${dbConf.escape(username)},${dbConf.escape(
+            hashPassword(password)
+          )},${dbConf.escape("/imgUsers/IMGUSERS-default.webp")})`
         );
 
-        let {
-          id,
-          username,
-          first_name,
-          last_name,
-          email,
-          profile_picture,
-          bio,
-          verified_status,
-        } = resultLogin[0];
-        let token = createToken(
-          {
+        if (registUser.insertId) {
+          let resultLogin = await dbQuery(
+            `select id, username, first_name, last_name, email, profile_picture, bio, verified_status from users where id=${registUser.insertId};`
+          );
+
+          let {
             id,
             username,
             first_name,
@@ -66,28 +71,42 @@ module.exports = {
             profile_picture,
             bio,
             verified_status,
-          },
-          "1h"
-        );
+          } = resultLogin[0];
+          let token = createToken(
+            {
+              id,
+              username,
+              first_name,
+              last_name,
+              email,
+              profile_picture,
+              bio,
+              verified_status,
+            },
+            "1h"
+          );
 
-        // Mengirimkan email
-        await transporter.sendMail({
-          from: "Admin",
-          to: email,
-          subject: "Account Verification Email",
-          html: `<div>
-            <h3>Click Link Below :</h3>
-            <a href="${process.env.FE_URL}/auth/verify/${token}">Verify Account</a>
-          </div>`,
-        });
-
-        if (resultLogin.length) {
-          return res.status(200).send(resultLogin[0]);
-        } else {
-          return res.status(404).send({
-            success: false,
-            message: "user not found",
+          // Mengirimkan email
+          await transporter.sendMail({
+            from: "Admin",
+            to: email,
+            subject: "Account Verification Email",
+            html: `<div>
+              <h3>Click Link Below :</h3>
+              <a href="${process.env.FE_URL}/auth/verify/${token}">Verify Account</a>
+            </div>`,
           });
+
+          if (resultLogin.length) {
+            return res
+              .status(200)
+              .send({ success: true, data: resultLogin[0] });
+          } else {
+            return res.status(404).send({
+              success: false,
+              message: "user not found",
+            });
+          }
         }
       }
     } catch (error) {
@@ -487,7 +506,7 @@ module.exports = {
             if (update) {
               return res.status(200).send({
                 succes: true,
-                message: "Password berhasil diubah"
+                message: "Password berhasil diubah",
               });
             }
           } catch (error) {
