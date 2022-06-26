@@ -5,7 +5,6 @@ const fs = require("fs");
 module.exports = {
   getAllPosts: async (req, res, next) => {
     try {
-      console.log(req.params)
       let resultPosts = await dbQuery(
         `select p.id, p.image, p.caption, p.created_at, p.user_id, u.username, u.profile_picture from posts p 
         join users u on u.id = p.user_id;`
@@ -52,13 +51,24 @@ module.exports = {
   },
   getPosts: async (req, res, next) => {
     try {
-      console.log(req.params)
-
-      let whereQuery = req.params.id == 0 ? `order by id desc limit 5` : `where p.id < ${req.params.id} order by id desc limit 5` 
+      let hasMore = true;
+      let whereQuery =
+        req.params.id == 0
+          ? `order by id desc limit 5`
+          : `where p.id < ${req.params.id} order by id desc limit 5`;
       let resultPosts = await dbQuery(
         `select p.id, p.image, p.caption, p.created_at, p.user_id, u.username, u.profile_picture from posts p 
         join users u on u.id = p.user_id ${whereQuery};`
       );
+      let allPosts = await dbQuery(`select id from posts`);
+
+      if (
+        resultPosts.length < 5 ||
+        resultPosts[resultPosts.length - 1].id == allPosts[0].id
+      ) {
+        hasMore = false;
+      }
+
       // let resultComments = await dbQuery(
       //   `select c.id, c.user_id, u.username, u.profile_picture, c.post_id, c.comment, c.created_at from comments c
       //   join users u on c.user_id = u.id`
@@ -94,7 +104,7 @@ module.exports = {
       //   });
       // });
 
-      res.status(200).send(resultPosts);
+      res.status(200).send({ posts: resultPosts, hasMore });
     } catch (error) {
       return next(error);
     }
@@ -109,8 +119,13 @@ module.exports = {
       );
       let resultComments = await dbQuery(
         `select c.id, c.user_id, u.username, u.profile_picture, c.post_id, c.comment, c.created_at from comments c
-        join users u on c.user_id = u.id where c.post_id=${id};`
+        join users u on c.user_id = u.id where c.post_id=${id} order by id desc limit 5;`
       );
+      let allComments = await dbQuery(
+        `select id from comments where post_id=${id}`
+      );
+      let hasMoreComments = allComments.length > 5 ? true : false;
+
       let resultLikes = await dbQuery(
         `select l.id, l.user_id, u.username, l.post_id from likes l
         join users u on l.user_id = u.id where l.post_id=${id};`
@@ -118,7 +133,30 @@ module.exports = {
       resultPost[0].comments = resultComments;
       resultPost[0].likes = resultLikes;
       // console.log(resultPost[0])
-      res.status(200).send(resultPost[0]);
+      res.status(200).send({ post: resultPost[0], hasMoreComments });
+    } catch (error) {
+      return next(error);
+    }
+  },
+  getMoreComments: async (req, res, next) => {
+    try {
+      let hasMore = true;
+      // let whereQuery =
+      //   req.params.id == 0
+      //     ? `order by id desc limit 5`
+      //     : `where p.id < ${req.params.lastIdComment} order by id desc limit 5`;
+      let resultComments = await dbQuery(
+        `select c.id, c.user_id, u.username, u.profile_picture, c.post_id, c.comment, c.created_at from comments c
+            join users u on c.user_id = u.id where c.post_id=${req.params.postId} and c.id < ${req.params.lastIdComment} order by id desc limit 5`
+      );
+      let allComments = await dbQuery(
+        `select id from comments where post_id =${req.params.postId}`
+      );
+      if (allComments[0].id === resultComments[resultComments.length - 1].id) {
+        hasMore = false;
+      }
+
+      res.status(200).send({comments:resultComments,hasMore});
     } catch (error) {
       return next(error);
     }
@@ -150,101 +188,106 @@ module.exports = {
   },
   addPost: async (req, res, next) => {
     // pengiriman data FE hanya token => masuk ke readtoken => untuk mendapatkan id, tidak dari req.body
-    if (req.dataUser.id){
-    // data yang dikirimkan: user_id, caption, image file
-    const uploadFile = uploader("/imgPosts", "IMGPOSTS").array("image", 1);
-    // console.log(uploadFile);
-    uploadFile(req, res, async (error) => {
-      try {
-        // console.log(req.body.data);
-        // console.log("pengecekan file:", req.files);
-        const { caption } = JSON.parse(req.body.data);
-        let addPost = await dbQuery(
-          `insert into posts (user_id, image, caption) value (${req.dataUser.id}, '/imgPosts/${req.files[0].filename}', '${caption}')`
-        );
-        if (addPost) {
-          res.status(200).send(addPost);
+    if (req.dataUser.id) {
+      // data yang dikirimkan: user_id, caption, image file
+      const uploadFile = uploader("/imgPosts", "IMGPOSTS").array("image", 1);
+      // console.log(uploadFile);
+      uploadFile(req, res, async (error) => {
+        try {
+          // console.log(req.body.data);
+          // console.log("pengecekan file:", req.files);
+          const { caption } = JSON.parse(req.body.data);
+          let addPost = await dbQuery(
+            `insert into posts (user_id, image, caption) value (${req.dataUser.id}, '/imgPosts/${req.files[0].filename}', '${caption}')`
+          );
+          if (addPost) {
+            res.status(200).send(addPost);
+          }
+        } catch (error) {
+          req.files.forEach((val) =>
+            fs.unlinkSync(`./public/imgPosts/${val.filename}`)
+          );
+          return next(error);
         }
-      } catch (error) {
-        req.files.forEach((val) =>
-          fs.unlinkSync(`./public/imgPosts/${val.filename}`)
-        );
-        return next(error);
-      }
-    });
-  }},
+      });
+    }
+  },
   editPost: async (req, res, next) => {
     // pengiriman data FE hanya token => masuk ke readtoken => untuk mendapatkan id, tidak dari req.body
-    if (req.dataUser.id){
-    // melakukan edit caption
-    try {
-      const { id, caption } = req.body;
-      let editPost = await dbQuery(
-        `update posts set caption='${caption}' where id=${id};`
-      );
-      if (editPost) {
-        res.status(200).send(editPost);
-      }
-    } catch (error) {
-      return next(error);
-    }
-  }},
-  deletePost: async (req, res, next) => {
-    // pengiriman data FE hanya token => masuk ke readtoken => untuk mendapatkan id, tidak dari req.body
-    if (req.dataUser.id){
-    try {
-      // get id post from request
-      const { id } = req.query;
-      let fileName = await dbQuery(`select image from posts where id=${id}`);
-
-      // delete
+    if (req.dataUser.id) {
+      // melakukan edit caption
       try {
-        fs.unlinkSync(`./public/${fileName[0].image}`);
-        let deletePost = await dbQuery(`delete from posts where id=${id}`);
-        if (deletePost) {
-          res.status(200).send(deletePost);
+        const { id, caption } = req.body;
+        let editPost = await dbQuery(
+          `update posts set caption='${caption}' where id=${id};`
+        );
+        if (editPost) {
+          res.status(200).send(editPost);
         }
       } catch (error) {
         return next(error);
       }
-    } catch (error) {
-      return next(error);
     }
-  }},
+  },
+  deletePost: async (req, res, next) => {
+    // pengiriman data FE hanya token => masuk ke readtoken => untuk mendapatkan id, tidak dari req.body
+    if (req.dataUser.id) {
+      try {
+        // get id post from request
+        const { id } = req.query;
+        let fileName = await dbQuery(`select image from posts where id=${id}`);
+
+        // delete
+        try {
+          fs.unlinkSync(`./public/${fileName[0].image}`);
+          let deletePost = await dbQuery(`delete from posts where id=${id}`);
+          if (deletePost) {
+            res.status(200).send(deletePost);
+          }
+        } catch (error) {
+          return next(error);
+        }
+      } catch (error) {
+        return next(error);
+      }
+    }
+  },
   addComment: async (req, res, next) => {
-    if (req.dataUser.id){
-    try {
-      const { post_id, comment } = req.body;
-      let addComment = await dbQuery(
-        `insert into comments (user_id, post_id, comment) value (${req.dataUser.id},${post_id},'${comment}')`
-      );
-      if (addComment) {
-        res.status(200).send({
-          success: true,
-          message: "Comment added",
-        });
+    if (req.dataUser.id) {
+      try {
+        const { post_id, comment } = req.body;
+        let addComment = await dbQuery(
+          `insert into comments (user_id, post_id, comment) value (${req.dataUser.id},${post_id},'${comment}')`
+        );
+        if (addComment) {
+          res.status(200).send({
+            success: true,
+            message: "Comment added",
+          });
+        }
+      } catch (error) {
+        return next(error);
       }
-    } catch (error) {
-      return next(error);
     }
-  }},
+  },
   addLike: async (req, res, next) => {
-    if (req.dataUser.id){
-    try {
-      const { user_id, post_id } = req.body;
-      let addLike = await dbQuery(
-        `insert into likes (user_id, post_id) value (${req.dataUser.id},${post_id})`
-      );
-      if (addLike) {
-        res.status(200).send({
-          success: true,
-          message: "Like added",
-        });
+    if (req.dataUser.id) {
+      try {
+        const { user_id, post_id } = req.body;
+        let addLike = await dbQuery(
+          `insert into likes (user_id, post_id) value (${req.dataUser.id},${post_id})`
+        );
+        if (addLike) {
+          res.status(200).send({
+            success: true,
+            message: "Like added",
+          });
+        }
+      } catch (error) {
+        return next(error);
       }
-    } catch (error) {
-      return next(error);
     }
-  }},
+  },
   removeLike: async (req, res, next) => {
     try {
       // console.log(req.query)

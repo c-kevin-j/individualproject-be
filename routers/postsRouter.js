@@ -6,6 +6,7 @@ route.get("/get", postsController.getAllPosts);
 route.get("/get/detail", postsController.detailPost);
 route.get("/get/userPost", postsController.getUserPosts);
 route.get("/get/likedPost", postsController.getLikedPosts);
+route.get("/get/comments/:postId/:lastIdComment",postsController.getMoreComments)
 route.get("/get/:id", postsController.getPosts);
 
 route.post("/add", readToken, postsController.addPost);
