@@ -145,11 +145,11 @@ module.exports = {
           verified_status,
         });
 
-        return res.status(200).send({ ...resultLogin[0], token });
+        return res.status(200).send({ success: true, user:{...resultLogin[0], token}});
       } else {
-        return res.status(404).send({
+        return res.status(200).send({
           success: false,
-          message: "user not found",
+          message: `Please input a correct username/email or password.`,
         });
       }
     } catch (error) {
@@ -492,11 +492,12 @@ module.exports = {
     // pengiriman data FE hanya token => masuk ke readtoken => untuk mendapatkan id, tidak dari req.body
     if (req.dataUser.id) {
       try {
-        const { id, oldPassword, newPassword } = req.body;
+        const { oldPassword, newPassword } = req.body;
         let password = await dbQuery(
           `select password from users where id = ${req.dataUser.id}`
         );
         if (hashPassword(oldPassword) == password[0].password) {
+          console.log("success")
           try {
             let update = await dbQuery(
               `update users set password = ${dbConf.escape(
@@ -505,7 +506,7 @@ module.exports = {
             );
             if (update) {
               return res.status(200).send({
-                succes: true,
+                success: true,
                 message: "Password berhasil diubah",
               });
             }
@@ -513,7 +514,7 @@ module.exports = {
             return next(error);
           }
         } else {
-          return res.status(400).send({
+          return res.status(200).send({
             succes: false,
             message: "Password lama tidak sesuai",
           });
