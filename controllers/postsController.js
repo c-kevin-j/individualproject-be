@@ -73,12 +73,12 @@ module.exports = {
       //   `select c.id, c.user_id, u.username, u.profile_picture, c.post_id, c.comment, c.created_at from comments c
       //   join users u on c.user_id = u.id`
       // );
-      // let resultLikes = await dbQuery(
-      //   `select l.id, l.user_id, u.username, l.post_id from likes l
-      //   join users u on l.user_id = u.id;`
-      // );
+      let resultLikes = await dbQuery(
+        `select l.id, l.user_id, u.username, l.post_id from likes l
+        join users u on l.user_id = u.id;`
+      );
 
-      // resultPosts.forEach((postVal) => {
+      resultPosts.forEach((postVal) => {
       //   let comments = [];
       //   resultComments.forEach((commentsVal) => {
       //     if (postVal.id == commentsVal.post_id) {
@@ -93,16 +93,16 @@ module.exports = {
       //     postVal.comments = comments;
       //   });
 
-      //   let likes = [];
-      //   resultLikes.forEach((likesVal) => {
-      //     if (postVal.id == likesVal.post_id) {
-      //       likes.push({
-      //         user_id: likesVal.user_id,
-      //       });
-      //     }
-      //     postVal.likes = likes;
-      //   });
-      // });
+        let likes = [];
+        resultLikes.forEach((likesVal) => {
+          if (postVal.id == likesVal.post_id) {
+            likes.push({
+              user_id: likesVal.user_id,
+            });
+          }
+          postVal.likes = likes;
+        });
+      });
 
       res.status(200).send({ posts: resultPosts, hasMore });
     } catch (error) {
@@ -156,7 +156,7 @@ module.exports = {
         hasMore = false;
       }
 
-      res.status(200).send({comments:resultComments,hasMore});
+      res.status(200).send({ comments: resultComments, hasMore });
     } catch (error) {
       return next(error);
     }
@@ -241,8 +241,10 @@ module.exports = {
         try {
           fs.unlinkSync(`./public/${fileName[0].image}`);
           let deletePost = await dbQuery(`delete from posts where id=${id}`);
+          let deleteComments = await dbQuery(`delete from comments where post_id=${id}`);
+          let deleteLikes = await dbQuery(`delete from likes where post_id=${id}`);
           if (deletePost) {
-            res.status(200).send(deletePost);
+            res.status(200).send({ success: true, message: "Post deleted" });
           }
         } catch (error) {
           return next(error);
@@ -290,16 +292,19 @@ module.exports = {
   },
   removeLike: async (req, res, next) => {
     try {
-      // console.log(req.query)
-      const { user_id, post_id } = req.query;
-      let removeLike = await dbQuery(
-        `delete from likes where user_id = ${user_id} and post_id=${post_id}`
-      );
-      if (removeLike) {
-        res.status(200).send({
-          success: true,
-          message: "Like removed",
-        });
+      console.log(req.query)
+      console.log(req.dataUser.id)
+      if (req.dataUser.id) {
+        const { user_id, post_id } = req.query;
+        let removeLike = await dbQuery(
+          `delete from likes where user_id = ${user_id} and post_id=${post_id}`
+        );
+        if (removeLike) {
+          res.status(200).send({
+            success: true,
+            message: "Like removed",
+          });
+        }
       }
     } catch (error) {
       return next(error);
