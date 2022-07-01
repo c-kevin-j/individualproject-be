@@ -35,10 +35,21 @@ module.exports = {
       const { email, username, password } = req.body;
 
       let currentUsers = await dbQuery(`select email,username from users`);
-      let emailCheck = currentUsers.map((val) => val.email).includes(email);
-      let usernameCheck = currentUsers
-        .map((val) => val.username)
-        .includes(username);
+      let emailCheck = false;
+      let usernameCheck = false;
+
+      for (let i =0; i<=currentUsers.length;i++){
+        if(currentUsers[i].email == email){
+          emailCheck=true
+        }
+        if(currentUsers[i].username == username){
+          usernameCheck = true
+        }
+      }
+      // emailCheck = currentUsers.map((val) => val.email).includes(email);
+      // usernameCheck = currentUsers
+      //   .map((val) => val.username)
+      //   .includes(username);
 
       if (emailCheck) {
         res
@@ -145,7 +156,9 @@ module.exports = {
           verified_status,
         });
 
-        return res.status(200).send({ success: true, user:{...resultLogin[0], token}});
+        return res
+          .status(200)
+          .send({ success: true, user: { ...resultLogin[0], token } });
       } else {
         return res.status(200).send({
           success: false,
@@ -369,54 +382,77 @@ module.exports = {
     // setelah itu create token ulang
     if (req.dataUser.id) {
       try {
-        let userData = await dbQuery(
-          `select * from users where id = ${req.dataUser.id}`
-        );
+        console.log(req.body.oldUsername);
+        // to check if new username is already registered
+        let usernameCheck = false;
 
-        let editScript = "";
-        for (userProp in userData[0]) {
-          for (dataProp in req.body) {
-            if (userProp == dataProp) {
-              editScript += `${userProp} = ${dbConf.escape(
-                req.body[dataProp]
-              )}, `;
+        if (req.body.oldUsername != req.body.username) {
+          let currentUsers = await dbQuery(`select username from users`);
+          for (let i = 0; i < currentUsers.length; i++) {
+            if (currentUsers[i].username == req.body.username) {
+              usernameCheck = true;
             }
           }
         }
-        editScript = editScript.substring(0, editScript.length - 2);
-        let updateUser = await dbQuery(
-          `update users set ${editScript} where id = ${req.dataUser.id};`
-        );
-        let newUserData = await dbQuery(
-          `select id, username, first_name, last_name, email, profile_picture, bio, verified_status from users where id = ${req.dataUser.id}`
-        );
-        let {
-          id,
-          username,
-          first_name,
-          last_name,
-          email,
-          profile_picture,
-          bio,
-          verified_status,
-        } = newUserData[0];
-        let token = createToken({
-          id,
-          username,
-          first_name,
-          last_name,
-          email,
-          profile_picture,
-          bio,
-          verified_status,
-        });
 
-        return res.status(200).send({
-          success: true,
-          message: "user updated",
-          updateUser,
-          token,
-        });
+        if (!usernameCheck) {
+          try {
+            let userData = await dbQuery(
+              `select * from users where id = ${req.dataUser.id}`
+            );
+
+            let editScript = "";
+            for (userProp in userData[0]) {
+              for (dataProp in req.body) {
+                if (userProp == dataProp) {
+                  editScript += `${userProp} = ${dbConf.escape(
+                    req.body[dataProp]
+                  )}, `;
+                }
+              }
+            }
+            editScript = editScript.substring(0, editScript.length - 2);
+            let updateUser = await dbQuery(
+              `update users set ${editScript} where id = ${req.dataUser.id};`
+            );
+            let newUserData = await dbQuery(
+              `select id, username, first_name, last_name, email, profile_picture, bio, verified_status from users where id = ${req.dataUser.id}`
+            );
+            let {
+              id,
+              username,
+              first_name,
+              last_name,
+              email,
+              profile_picture,
+              bio,
+              verified_status,
+            } = newUserData[0];
+            let token = createToken({
+              id,
+              username,
+              first_name,
+              last_name,
+              email,
+              profile_picture,
+              bio,
+              verified_status,
+            });
+            return res.status(200).send({
+              success: true,
+              message: "user updated",
+              updateUser,
+              token,
+            });
+          } catch (error) {
+            console.log(error);
+          }
+        } else {
+          return res.status(200).send({
+            success: false,
+            message: "username is already used",
+          });
+        }
       } catch (error) {
         return next(error);
       }
@@ -497,7 +533,7 @@ module.exports = {
           `select password from users where id = ${req.dataUser.id}`
         );
         if (hashPassword(oldPassword) == password[0].password) {
-          console.log("success")
+          console.log("success");
           try {
             let update = await dbQuery(
               `update users set password = ${dbConf.escape(
