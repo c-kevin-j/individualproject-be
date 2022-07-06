@@ -1,19 +1,37 @@
-const express = require('express')
-const app = express()
-const cors = require('cors');
+const express = require("express");
+const app = express();
+const cors = require("cors");
 const dotenv = require("dotenv"); // menyimpan value ke dalam env variable
 // const mysql = require('mysql')
-const bearerToken = require('express-bearer-token')
+const bearerToken = require("express-bearer-token");
 
 dotenv.config();
 
 const PORT = process.env.PORT;
 
 // memberi ijin pada browser / fe supaya bisa langsung mengakses direktori yang ditentukan
-app.use(express.static('public'))
+app.use(express.static("public"));
 
 app.use(express.json());
-app.use(cors());
+
+app.use(cors({
+  credentials: true,
+  // origin:'http://localhost:3000'
+}));
+app.options('*', cors())
+
+// const allowCORS= app.use(function (req, res, next) {
+//   res.header("Access-Control-Allow-Origin", "*");
+//   res.header(
+//     "Access-Control-Allow-Headers",
+//     "Origin, X-Requested-With, Content-Type, Accept"
+//   );
+//   next();
+// });
+// var corsOptions = {
+//   origin: 'https://individualproject-3gdh0lyz1-c-kevin-j.vercel.app/',
+// }
+
 app.use(bearerToken());
 
 // DB Check Connection
@@ -34,10 +52,10 @@ app.get("/", (req, res) => {
 });
 
 // Handling error => menangkap error dari controller
-app.use((error,req,res,next)=>{  
+app.use((error, req, res, next) => {
   console.log(error);
-  res.status(500).send(error)
-})
+  res.status(500).send(error);
+});
 
 app.listen(PORT, () => console.log(`RUnning API at PORT ${PORT}`));
 
