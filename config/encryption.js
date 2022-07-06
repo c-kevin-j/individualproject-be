@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken"); // yang akan membuat enkripsi keseluruhan data
 const Crypto = require("crypto"); // library bawaan dari express untuk mengenkripsi password
+const { dbConf, dbQuery } = require("../config/database");
 
 module.exports = {
   hashPassword: (password) => {
@@ -11,14 +12,53 @@ module.exports = {
       .digest("hex");
   },
 
-  createToken: (payload) => {
+  createToken: (payload, time = "24h") => {
     // payload berisi data apa saja yang mau diubah menjadi token
     //.sign berisi datanya dan key/kunci bisa dibedakan dengan yang hashPassword
     let token = jwt.sign(payload, "individual-project-purwadhika", {
-      expiresIn: "12h",
+      expiresIn: time,
     });
 
     return token;
+  },
+  // untuk check apakah token sudah ada sebelumnya atau tidak, terutama untuk verifikasi dan forgot password
+  checkToken: async (req, res, next) => {
+    try {
+      let dataToken = await dbQuery(
+        `select * from token where token="${req.token}" and type="${req.body.type}"`
+      );
+      if (dataToken.length) {
+        console.log("Token exist");
+        // next()
+        jwt.verify(
+          req.token,"individual-project-purwadhika", (err, decode) => {
+            if (err) {
+              return res.status(401).send({
+                success:false,
+                message: "Token expired ❌",
+              });
+            }
+            return res.status(200).send({
+              success: true,
+              message: "Token valid",
+            });
+            // // supaya bisa menjalankan ke middleware berikutnya
+            // next();
+          }
+        );
+      } else {
+        return res.status(401).send({
+          success: false,
+          message: "Token invalid",
+        });
+      }
+    } catch (error) {
+      res.status(401).send({
+        success: false,
+        message: "Token invalid",
+      });
+      return next(error);
+    }
   },
   readToken: (req, res, next) => {
     // untuk menerjemahkan data yang sudah dibuat oleh createToken
