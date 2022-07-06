@@ -3,6 +3,7 @@ const { hashPassword, createToken } = require("../config/encryption");
 const { uploader } = require("../config/uploader");
 const fs = require("fs");
 const { transporter } = require("../config/nodemailer");
+const crypto = require("crypto");
 
 module.exports = {
   getUsers: async (req, res, next) => {
@@ -34,16 +35,18 @@ module.exports = {
 
       const { email, username, password } = req.body;
 
-      let currentUsers = await dbQuery(`select email,username from users`);
+      let currentUsers = await dbQuery(
+        `select email as userEmail, username from users`
+      );
       let emailCheck = false;
       let usernameCheck = false;
 
-      for (let i =0; i<=currentUsers.length;i++){
-        if(currentUsers[i].email == email){
-          emailCheck=true
+      for (let i = 0; i < currentUsers.length; i++) {
+        if (currentUsers[i].userEmail == email) {
+          emailCheck = true;
         }
-        if(currentUsers[i].username == username){
-          usernameCheck = true
+        if (currentUsers[i].username == username) {
+          usernameCheck = true;
         }
       }
       // emailCheck = currentUsers.map((val) => val.email).includes(email);
@@ -83,7 +86,55 @@ module.exports = {
             bio,
             verified_status,
           } = resultLogin[0];
+
+          // generate random string to generate token
+          let randomString = crypto.randomBytes(10).toString("hex");
+
           let token = createToken(
+            {
+              id,
+              username,
+              first_name,
+              last_name,
+              email,
+              profile_picture,
+              bio,
+              verified_status,
+              randomString,
+            },
+            "1h"
+          );
+
+          // insert token to database
+
+          let insertToken = await dbQuery(
+            `insert into token (user_id, type, token) value (${dbConf.escape(
+              registUser.insertId
+            )}, "verification", ${dbConf.escape(token)})`
+          );
+
+          let mailContent = fs.readFileSync(
+            "./email/email_verification.html",
+            "utf8",
+            function (err, data) {
+              if (err) throw err;
+              console.log(data);
+            }
+          );
+          mailContent = mailContent.replace("#name", username);
+          mailContent = mailContent.replace(
+            "#link",
+            `${process.env.FE_URL}/auth/verify/${token}`
+          );
+          // Mengirimkan email
+          await transporter.sendMail({
+            from: "Admin",
+            to: email,
+            subject: "Account Verification Email",
+            html: `${mailContent}`,
+          });
+
+          let tokenLogin = createToken(
             {
               id,
               username,
@@ -97,21 +148,10 @@ module.exports = {
             "1h"
           );
 
-          // Mengirimkan email
-          await transporter.sendMail({
-            from: "Admin",
-            to: email,
-            subject: "Account Verification Email",
-            html: `<div>
-              <h3>Click Link Below :</h3>
-              <a href="${process.env.FE_URL}/auth/verify/${token}">Verify Account</a>
-            </div>`,
-          });
-
           if (resultLogin.length) {
             return res
               .status(200)
-              .send({ success: true, data: resultLogin[0] });
+              .send({ success: true, user: { ...resultLogin[0], tokenLogin } });
           } else {
             return res.status(404).send({
               success: false,
@@ -170,8 +210,10 @@ module.exports = {
     }
   },
   keepLogin: async (req, res, next) => {
+    // console.log("keeplogin",req)
     try {
       // request body mengirimkan token id user yang disimpan dari local storage
+
       if (req.dataUser.id) {
         let resultLogin = await dbQuery(
           `select id, username, first_name, last_name, email, profile_picture, bio, verified_status from users where id=${req.dataUser.id};`
@@ -211,6 +253,7 @@ module.exports = {
       return next(error);
     }
   },
+  // to change user verified status
   verifyUser: async (req, res, next) => {
     try {
       if (req.dataUser.id) {
@@ -251,6 +294,7 @@ module.exports = {
       return next(error);
     }
   },
+  // resend verification
   sendVerification: async (req, res, next) => {
     try {
       // console.log("resend verification req.dataUser", req.dataUser);
@@ -272,6 +316,11 @@ module.exports = {
             verified_status,
           } = userData[0];
           // token bisa disesuaikan supaya masa tenggang expired dipersingkat, misal 15 menit- 1 jam
+          // token to verify user
+
+          // generate random string to generate token
+          let randomString = crypto.randomBytes(10).toString("hex");
+
           let token = createToken(
             {
               id,
@@ -282,20 +331,55 @@ module.exports = {
               profile_picture,
               bio,
               verified_status,
+              randomString,
             },
             "1h"
           );
 
+          // // check jika sudah ada token dari user di database token
+          // let tokenData = await dbQuery (`select * from token where user_id=${dbConf.escape(id)} and type="verification"`)
+
+          // // jika belum ada, insert token to database
+          // let insertToken = await dbQuery (`insert into token (user_id, type, token) value (${dbConf.escape(registUser.insertId)}, "verification", (${dbConf.escape(token)})`)
+
+          // update token pada database
+          let updateToken = await dbQuery(
+            `update token set token=${dbConf.escape(
+              token
+            )} where user_id=${dbConf.escape(id)} and type="verification"`
+          );
+
+          let mailContent = fs.readFileSync(
+            "./email/email_verification.html",
+            "utf8",
+            function (err, data) {
+              if (err) throw err;
+              console.log(data);
+            }
+          );
+          mailContent = mailContent.replace("#name", username);
+          mailContent = mailContent.replace(
+            "#link",
+            `${process.env.FE_URL}/auth/verify/${token}`
+          );
           // Mengirimkan email
           await transporter.sendMail({
             from: "Admin",
             to: email,
             subject: "Account Verification Email",
-            html: `<div>
-            <h3>Click Link Below :</h3>
-            <a href="${process.env.FE_URL}/auth/verify/${token}">Verify Account</a>
-          </div>`,
+            html: `${mailContent}`,
           });
+          // // Mengirimkan email
+          // await transporter.sendMail({
+          //   from: "Admin",
+          //   to: email,
+          //   subject: "Account Verification Email",
+          //   html: `<div>
+          //   <h3>Click this link to verify your account:</h3>
+          //   <a href="${process.env.FE_URL}/auth/verify/${token}">Verify Account</a>
+          //   <h5>This link is only valid for 1 hour</h5>
+          // </div>`,
+          // });
           res
             .status(200)
             .send({ success: true, message: "Email Verification Sent" });
@@ -321,27 +405,78 @@ module.exports = {
           bio,
           verified_status,
         } = userData[0];
-        let token = createToken({
-          id,
-          username,
-          first_name,
-          last_name,
-          email,
-          profile_picture,
-          bio,
-          verified_status,
-        });
 
+        let randomString = crypto.randomBytes(10).toString("hex");
+        let token = createToken(
+          {
+            id,
+            username,
+            first_name,
+            last_name,
+            email,
+            profile_picture,
+            bio,
+            verified_status,
+            randomString,
+          },
+          "1h"
+        );
+
+        let dataToken = await dbQuery(
+          `select * from token where user_id=${dbConf.escape(
+            id
+          )} and type="forgot-password"`
+        );
+
+        if (dataToken.length) {
+          // update token pada database
+          let updateToken = await dbQuery(
+            `update token set token=${dbConf.escape(
+              token
+            )} where user_id=${dbConf.escape(id)} and type="forgot-password"`
+          );
+        } else {
+          // insert token pada database
+          let insertToken = await dbQuery(
+            `insert into token (user_id, type, token) value (${dbConf.escape(
+              id
+            )}, "forgot-password", ${dbConf.escape(token)})`
+          );
+        }
+
+
+        let mailContent = fs.readFileSync(
+          "./email/email_verification.html",
+          "utf8",
+          function (err, data) {
+            if (err) throw err;
+            console.log(data);
+          }
+        );
+        mailContent = mailContent.replace("#name", username);
+        mailContent = mailContent.replace(
+          "#link",
+          `${process.env.FE_URL}/auth/verify/${token}`
+        );
+        // Mengirimkan email
         await transporter.sendMail({
           from: "Admin",
           to: email,
           subject: "Forgot Password Email",
-          html: `<div>
-            <h3>You have requested to reset your password</h3> 
-            <h5>If it is really you, click the link below. If not please ignore this email</h5>
-            <a href="${process.env.FE_URL}/auth/reset-password/${token}">Reset Password</a>
-          </div>`,
+          html: `${mailContent}`,
         });
+        // await transporter.sendMail({
+        //   from: "Admin",
+        //   to: email,
+        //   subject: "Forgot Password Email",
+        //   html: `<div>
+        //     <h3>You have requested to reset your password</h3> 
+        //     <h5>Click this link to reset your password</h5>
+        //     <a href="${process.env.FE_URL}/auth/reset-password/${token}">Reset Password</a>
+        //     <h5>If you didn't request this code, you can safely ignore this email. Someone else might have typed your email address by mistake.</h5>
+        //     <h5>This link is only valid for 1 hour</h5>
+        //   </div>`,
+        // });
 
         res.status(200).send({ success: true, message: "Email sent" });
       } else {
@@ -382,7 +517,6 @@ module.exports = {
     // setelah itu create token ulang
     if (req.dataUser.id) {
       try {
-        console.log(req.body.oldUsername);
         // to check if new username is already registered
         let usernameCheck = false;
 
@@ -533,7 +667,6 @@ module.exports = {
           `select password from users where id = ${req.dataUser.id}`
         );
         if (hashPassword(oldPassword) == password[0].password) {
-          console.log("success");
           try {
             let update = await dbQuery(
               `update users set password = ${dbConf.escape(
@@ -543,7 +676,7 @@ module.exports = {
             if (update) {
               return res.status(200).send({
                 success: true,
-                message: "Password berhasil diubah",
+                message: "Password successfully changed",
               });
             }
           } catch (error) {
@@ -552,7 +685,7 @@ module.exports = {
         } else {
           return res.status(200).send({
             succes: false,
-            message: "Password lama tidak sesuai",
+            message: "Your old password is not matched",
           });
         }
       } catch (error) {
