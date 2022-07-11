@@ -440,7 +440,7 @@ module.exports = {
 
 
         let mailContent = fs.readFileSync(
-          "./email/email_verification.html",
+          "./email/email_forgotpassword.html",
           "utf8",
           function (err, data) {
             if (err) throw err;
@@ -450,7 +450,7 @@ module.exports = {
         mailContent = mailContent.replace("#name", username);
         mailContent = mailContent.replace(
           "#link",
-          `${process.env.FE_URL}/auth/verify/${token}`
+          `${process.env.FE_URL}/auth/reset-password/${token}`
         );
         // Mengirimkan email
         await transporter.sendMail({
