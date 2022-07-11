@@ -41,7 +41,6 @@ dbConf.getConnection((error, connection) => {
     console.log("Error MySQL Connection ", error.message, error.sqlMessage);
   }
 
-  // console.log(`Connected to MySQL Server ✅ : ${connection.threadId}`);
   console.log(`Connected to MySQL Server ✅`);
 });
 
@@ -62,22 +61,3 @@ app.listen(PORT, () => console.log(`RUnning API at PORT ${PORT}`));
 const { usersRouter, postsRouter } = require("./routers");
 app.use("/users", usersRouter);
 app.use("/posts", postsRouter);
-
-// const db = mysql.createPool({
-//     host: 'localhost',
-//     user: 'root',
-//     password: 'password',
-//     database: 'socialmediadb',
-// })
-
-// app.get("/", (req, res) => {
-//     const sqlInsert = "INSERT INTO user (first_name, last_name, email, password, profile_picture, bio, verified_status) VALUES ('Kaguya', 'sama', 'kaguya@sama.com', 'pass', 'prf', 'bio', 1);"
-//     db.query(sqlInsert, (err, result) => {
-//         res.send("hello ehe k");
-//         console.log(err)
-//     })
-// })
-
-// app.listen(3001, () => {
-//     console.log('run on port 3001')
-// })

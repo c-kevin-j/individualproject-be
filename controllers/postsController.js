@@ -191,11 +191,8 @@ module.exports = {
     if (req.dataUser.id) {
       // data yang dikirimkan: user_id, caption, image file
       const uploadFile = uploader("/imgPosts", "IMGPOSTS").array("image", 1);
-      // console.log(uploadFile);
       uploadFile(req, res, async (error) => {
         try {
-          // console.log(req.body.data);
-          // console.log("pengecekan file:", req.files);
           const { caption } = JSON.parse(req.body.data);
           let addPost = await dbQuery(
             `insert into posts (user_id, image, caption) value (${req.dataUser.id}, '/imgPosts/${req.files[0].filename}', '${caption}')`

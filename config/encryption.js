@@ -29,7 +29,6 @@ module.exports = {
       );
       if (dataToken.length) {
         console.log("Token exist");
-        // next()
         jwt.verify(
           req.token,"individual-project-purwadhika", (err, decode) => {
             if (err) {
@@ -42,8 +41,6 @@ module.exports = {
               success: true,
               message: "Token valid",
             });
-            // // supaya bisa menjalankan ke middleware berikutnya
-            // next();
           }
         );
       } else {

@@ -31,13 +31,13 @@ module.exports = {
       // first_name, last_name, bio default value kosong
       // verified status default 1 => false, nanti setelah verifikasi dibuat 0 => true
       // profile picture diisikan dengan gambar default
-      // console.log(hashPassword(req.body.password))
 
       const { email, username, password } = req.body;
 
       let currentUsers = await dbQuery(
         `select email as userEmail, username from users`
       );
+      // check if email / username is already in use
       let emailCheck = false;
       let usernameCheck = false;
 
@@ -49,10 +49,6 @@ module.exports = {
           usernameCheck = true;
         }
       }
-      // emailCheck = currentUsers.map((val) => val.email).includes(email);
-      // usernameCheck = currentUsers
-      //   .map((val) => val.username)
-      //   .includes(username);
 
       if (emailCheck) {
         res
@@ -210,7 +206,6 @@ module.exports = {
     }
   },
   keepLogin: async (req, res, next) => {
-    // console.log("keeplogin",req)
     try {
       // request body mengirimkan token id user yang disimpan dari local storage
 
@@ -297,7 +292,6 @@ module.exports = {
   // resend verification
   sendVerification: async (req, res, next) => {
     try {
-      // console.log("resend verification req.dataUser", req.dataUser);
       if (req.dataUser.id) {
         let userData = await dbQuery(
           `select id,username,first_name,last_name,email,profile_picture,bio,verified_status FROM users WHERE id=${req.dataUser.id} ;`
